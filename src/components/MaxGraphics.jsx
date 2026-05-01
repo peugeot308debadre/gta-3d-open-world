@@ -2,7 +2,7 @@ import React, { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Sparkles } from '@react-three/drei'
 import * as THREE from 'three'
-import { createGrassTexture } from './proceduralTextures'
+import { createGrassTexture } from '../utils/proceduralTextures'
 
 function seededRandom(seed) {
   let s = seed
