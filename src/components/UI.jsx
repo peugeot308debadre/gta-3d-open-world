@@ -96,7 +96,14 @@ function GTAMiniMap() {
   // Store building footprints for minimap
   const buildingFootprints = useMemo(() => {
     const buildings = []
-    const rng = () => { let s = 42; return () => { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646 } }()
+    function makeRng() {
+      let s = 42
+      return () => {
+        s = (s * 16807) % 2147483647
+        return (s - 1) / 2147483646
+      }
+    }
+    const rng = makeRng()
     const gridSize = 6
     for (let gx = -gridSize; gx <= gridSize; gx++) {
       for (let gz = -gridSize; gz <= gridSize; gz++) {
