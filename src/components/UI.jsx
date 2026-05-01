@@ -14,6 +14,7 @@ export default function UI() {
       <GTAMoney />
       <GTAWantedStars />
       <GTAWeapon />
+      <AmmoShop />
       <Controls />
     </div>
   )
@@ -278,18 +279,104 @@ function GTAWantedStars() {
 }
 
 function GTAWeapon() {
+  const weapons = useGameStore((s) => s.weapons)
+  const currentWeaponIndex = useGameStore((s) => s.currentWeaponIndex)
+  const weapon = weapons[currentWeaponIndex]
+
   return (
     <div style={{
       position: 'absolute', bottom: 20, right: 20,
-      background: 'rgba(0,0,0,0.5)',
-      padding: '8px 12px', borderRadius: '4px',
-      border: '1px solid rgba(255,255,255,0.1)',
-      display: 'flex', alignItems: 'center', gap: '8px',
+      background: 'rgba(0,0,0,0.6)', padding: '8px 14px', borderRadius: '6px',
+      border: '1px solid rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', gap: '10px',
+      backdropFilter: 'blur(3px)',
     }}>
-      <span style={{ fontSize: '24px' }}>👊</span>
-      <span style={{ color: '#ffffff', fontSize: '12px', fontFamily: 'monospace', textShadow: '1px 1px 2px #000' }}>
-        ∞
-      </span>
+      <span style={{ fontSize: '26px' }}>{weapon.icon}</span>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+        <span style={{ color: '#ffffff', fontSize: '12px', fontWeight: 'bold', fontFamily: 'monospace', textShadow: '1px 1px 2px #000' }}>
+          {weapon.name}
+        </span>
+        <span style={{ color: weapon.ammo === Infinity ? '#88ff88' : weapon.ammo > 10 ? '#ffdd44' : '#ff4444', fontSize: '14px', fontFamily: 'monospace', fontWeight: 'bold' }}>
+          {weapon.ammo === Infinity ? '∞' : weapon.ammo}
+        </span>
+      </div>
+      <div style={{ display: 'flex', gap: '2px', alignItems: 'center' }}>
+        {weapons.map((w, i) => (
+          <div key={i} style={{
+            width: '6px', height: '6px', borderRadius: '50%',
+            background: i === currentWeaponIndex ? '#ffdd44' : 'rgba(255,255,255,0.3)',
+          }} />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function AmmoShop() {
+  const [open, setOpen] = useState(false)
+  const weapons = useGameStore((s) => s.weapons)
+  const money = useGameStore((s) => s.money)
+  const addAmmo = useGameStore((s) => s.addAmmo)
+  const spendMoney = useGameStore((s) => s.spendMoney)
+
+  // Press B to open shop
+  useEffect(() => {
+    const handleKey = (e) => {
+      if (e.code === 'KeyB') setOpen((v) => !v)
+    }
+    window.addEventListener('keydown', handleKey)
+    return () => window.removeEventListener('keydown', handleKey)
+  }, [])
+
+  if (!open) return (
+    <div style={{
+      position: 'absolute', bottom: 80, right: 20,
+      color: 'rgba(255,255,255,0.4)', fontSize: '10px', fontFamily: 'monospace',
+    }}>
+      [B] Munitions
+    </div>
+  )
+
+  const shopItems = [
+    { idx: 1, label: 'Pistolet ×30', price: 200, amount: 30 },
+    { idx: 2, label: 'SMG ×100', price: 800, amount: 100 },
+    { idx: 3, label: 'RPG ×2', price: 3000, amount: 2 },
+  ]
+
+  return (
+    <div style={{
+      position: 'absolute', right: 20, top: '50%', transform: 'translateY(-50%)',
+      background: 'rgba(0,0,0,0.85)', padding: '16px', borderRadius: '8px',
+      border: '2px solid rgba(255,200,0,0.4)', color: '#fff', fontSize: '12px',
+      fontFamily: 'monospace', minWidth: '180px', pointerEvents: 'auto',
+      backdropFilter: 'blur(5px)',
+    }}>
+      <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '14px', marginBottom: '10px', color: '#ffcc00' }}>
+        💰 BOUTIQUE
+      </div>
+      <div style={{ textAlign: 'center', color: '#88dd44', fontSize: '11px', marginBottom: '10px' }}>
+        ${money.toLocaleString()}
+      </div>
+      {shopItems.map((item) => (
+        <div key={item.idx} style={{
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.1)',
+        }}>
+          <span>{item.label}</span>
+          <button
+            onClick={() => { if (spendMoney(item.price)) addAmmo(item.idx, item.amount) }}
+            style={{
+              background: money >= item.price ? '#44aa22' : '#444',
+              color: '#fff', border: 'none', padding: '4px 10px', borderRadius: '4px',
+              cursor: money >= item.price ? 'pointer' : 'not-allowed', fontSize: '11px', fontWeight: 'bold',
+            }}
+          >
+            ${item.price}
+          </button>
+        </div>
+      ))}
+      <div style={{ textAlign: 'center', marginTop: '10px', color: '#888', fontSize: '10px' }}>
+        [B] Fermer
+      </div>
     </div>
   )
 }
@@ -314,10 +401,13 @@ function Controls() {
       <div style={{ fontWeight: 'bold', fontSize: '13px', marginBottom: '6px', color: '#44aaff' }}>
         🎮 Controls
       </div>
-      <div><b style={{ color: '#fff' }}>WASD</b> / Arrows — Move</div>
+      <div><b style={{ color: '#fff' }}>WASD</b> — Move</div>
       <div><b style={{ color: '#fff' }}>Shift</b> — Sprint</div>
       <div><b style={{ color: '#fff' }}>Space</b> — Jump</div>
-      <div><b style={{ color: '#fff' }}>Mouse</b> — Look around</div>
+      <div><b style={{ color: '#fff' }}>Mouse</b> — Look + Shoot</div>
+      <div><b style={{ color: '#fff' }}>1-4</b> — Switch weapon</div>
+      <div><b style={{ color: '#fff' }}>Scroll</b> — Cycle weapon</div>
+      <div><b style={{ color: '#fff' }}>B</b> — Ammo shop</div>
     </div>
   )
 }

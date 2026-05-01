@@ -5,13 +5,12 @@ import * as THREE from 'three'
 import useGameStore from '../hooks/useGameStore'
 import { keysPressed, getMovementVector } from '../hooks/useKeyboardControls'
 
-const PLAYER_SPEED = 8
+const PLAYER_SPEED = 10
 const SPRINT_MULTIPLIER = 2.0
 const JUMP_FORCE = 7
-const DAMPING = 0.85
-const CAMERA_DISTANCE = 12
-const CAMERA_HEIGHT = 8
-const CAMERA_SMOOTHING = 0.05
+const CAMERA_DISTANCE = 10
+const CAMERA_HEIGHT = 6
+const CAMERA_SMOOTHING = 0.08
 
 export default function Player() {
   const { camera } = useThree()
@@ -20,13 +19,19 @@ export default function Player() {
   const setIsRunning = useGameStore((s) => s.setIsRunning)
   const setSpeed = useGameStore((s) => s.setSpeed)
   const setPlayerMinimapAngle = useGameStore((s) => s.setPlayerMinimapAngle)
+  const weapons = useGameStore((s) => s.weapons)
+  const currentWeaponIndex = useGameStore((s) => s.currentWeaponIndex)
+  const setCurrentWeaponIndex = useGameStore((s) => s.setCurrentWeaponIndex)
+  const lastFireTime = useGameStore((s) => s.lastFireTime)
+  const setLastFireTime = useGameStore((s) => s.setLastFireTime)
+  const setIsShooting = useGameStore((s) => s.setIsShooting)
 
   const [sphereRef, api] = useSphere(() => ({
     mass: 80,
     position: [0, 2, 0],
-    args: [0.6],
-    material: { friction: 0.3, restitution: 0.1 },
-    linearDamping: 0.9,
+    args: [0.5],
+    material: { friction: 0.6, restitution: 0.1 },
+    linearDamping: 0.5,
     angularDamping: 0.99,
   }))
 
@@ -36,14 +41,16 @@ export default function Player() {
   const cameraAngleY = useRef(0)
   const isDragging = useRef(false)
   const lastMouse = useRef({ x: 0, y: 0 })
-  const isMovingRef = useRef(false)
-  const isSprintingRef = useRef(false)
+  const mouseDown = useRef(false)
 
-  // Refs for limb animation
   const leftArmRef = useRef()
   const rightArmRef = useRef()
   const leftLegRef = useRef()
   const rightLegRef = useRef()
+
+  // Shooting raycaster
+  const raycaster = useRef(new THREE.Raycaster())
+  const projectilesRef = useRef([])
 
   useEffect(() => {
     const unsubVel = api.velocity.subscribe((v) => { velocity.current = v })
@@ -51,41 +58,71 @@ export default function Player() {
     return () => { unsubVel(); unsubPos() }
   }, [api])
 
+  // Mouse + keyboard input
   useEffect(() => {
     const handleMouseDown = (e) => {
-      if (e.button === 2 || e.button === 0) {
+      if (e.button === 0) {
+        mouseDown.current = true
+        setIsShooting(true)
+      }
+      if (e.button === 2) {
         isDragging.current = true
-        lastMouse.current = { x: e.clientX, y: e.clientY }
+      }
+      lastMouse.current = { x: e.clientX, y: e.clientY }
+    }
+    const handleMouseUp = (e) => {
+      if (e.button === 0) {
+        mouseDown.current = false
+        setIsShooting(false)
+      }
+      if (e.button === 2) {
+        isDragging.current = false
       }
     }
-    const handleMouseUp = () => { isDragging.current = false }
     const handleMouseMove = (e) => {
-      if (isDragging.current) {
+      if (isDragging.current || mouseDown.current) {
         const dx = e.clientX - lastMouse.current.x
-        cameraAngleY.current -= dx * 0.005
-        lastMouse.current = { x: e.clientX, y: e.clientY }
+        cameraAngleY.current -= dx * 0.004
       }
+      lastMouse.current = { x: e.clientX, y: e.clientY }
     }
     const handleContextMenu = (e) => e.preventDefault()
+    const handleWheel = (e) => {
+      // Scroll to switch weapons
+      if (e.deltaY > 0) {
+        setCurrentWeaponIndex((currentWeaponIndex + 1) % weapons.length)
+      } else {
+        setCurrentWeaponIndex((currentWeaponIndex - 1 + weapons.length) % weapons.length)
+      }
+    }
+    const handleKeyDown = (e) => {
+      // Number keys to switch weapons
+      if (e.code === 'Digit1') setCurrentWeaponIndex(0)
+      if (e.code === 'Digit2') setCurrentWeaponIndex(1)
+      if (e.code === 'Digit3') setCurrentWeaponIndex(2)
+      if (e.code === 'Digit4') setCurrentWeaponIndex(3)
+    }
 
     window.addEventListener('mousedown', handleMouseDown)
     window.addEventListener('mouseup', handleMouseUp)
     window.addEventListener('mousemove', handleMouseMove)
     window.addEventListener('contextmenu', handleContextMenu)
+    window.addEventListener('wheel', handleWheel)
+    window.addEventListener('keydown', handleKeyDown)
     return () => {
       window.removeEventListener('mousedown', handleMouseDown)
       window.removeEventListener('mouseup', handleMouseUp)
       window.removeEventListener('mousemove', handleMouseMove)
       window.removeEventListener('contextmenu', handleContextMenu)
+      window.removeEventListener('wheel', handleWheel)
+      window.removeEventListener('keydown', handleKeyDown)
     }
-  }, [])
+  }, [currentWeaponIndex, weapons.length, setCurrentWeaponIndex, setIsShooting])
 
   useFrame((state, delta) => {
     const { forward, right, jump, sprint } = getMovementVector(keysPressed)
     const speed = PLAYER_SPEED * (sprint ? SPRINT_MULTIPLIER : 1)
     const isMoving = forward !== 0 || right !== 0
-    isMovingRef.current = isMoving
-    isSprintingRef.current = sprint
 
     const angle = cameraAngleY.current
     const sinA = Math.sin(angle)
@@ -95,16 +132,16 @@ export default function Player() {
     const moveZ = (-right * sinA + forward * cosA) * speed
 
     if (isMoving) {
-      api.velocity.set(moveX * DAMPING, velocity.current[1], moveZ * DAMPING)
+      api.velocity.set(moveX, velocity.current[1], moveZ)
       setPlayerRotation(Math.atan2(moveX, moveZ))
     } else {
-      api.velocity.set(velocity.current[0] * 0.9, velocity.current[1], velocity.current[2] * 0.9)
+      api.velocity.set(velocity.current[0] * 0.85, velocity.current[1], velocity.current[2] * 0.85)
     }
 
-    if (jump && canJump.current && Math.abs(velocity.current[1]) < 0.5) {
+    if (jump && canJump.current && Math.abs(velocity.current[1]) < 1.5) {
       api.velocity.set(velocity.current[0], JUMP_FORCE, velocity.current[2])
       canJump.current = false
-      setTimeout(() => { canJump.current = true }, 500)
+      setTimeout(() => { canJump.current = true }, 400)
     }
 
     setPlayerPosition([...position.current])
@@ -124,11 +161,20 @@ export default function Player() {
       if (leftLegRef.current) leftLegRef.current.rotation.x = -swing
       if (rightLegRef.current) rightLegRef.current.rotation.x = swing
     } else {
-      // Return to rest pose
       if (leftArmRef.current) leftArmRef.current.rotation.x *= 0.9
       if (rightArmRef.current) rightArmRef.current.rotation.x *= 0.9
       if (leftLegRef.current) leftLegRef.current.rotation.x *= 0.9
       if (rightLegRef.current) rightLegRef.current.rotation.x *= 0.9
+    }
+
+    // Shooting
+    const weapon = weapons[currentWeaponIndex]
+    if (mouseDown.current && weapon.ammo > 0) {
+      const now = state.clock.getElapsedTime()
+      if (now - lastFireTime > weapon.fireRate) {
+        setLastFireTime(now)
+        fireWeapon(weapon, position.current, cameraAngleY.current)
+      }
     }
 
     // Camera follow
@@ -139,29 +185,101 @@ export default function Player() {
     camera.lookAt(new THREE.Vector3(pos[0], pos[1] + 1.5, pos[2]))
   })
 
+  function fireWeapon(weapon, pos, angle) {
+    if (weapon.type === 'melee') return // TODO: melee
+    const dir = new THREE.Vector3(-Math.sin(angle), 0, -Math.cos(angle))
+    const origin = new THREE.Vector3(pos[0], pos[1] + 1.2, pos[2])
+    // Spawn projectile
+    projectilesRef.current.push({
+      origin: origin.clone(),
+      direction: dir.clone(),
+      speed: weapon.type === 'rocket' ? 40 : 120,
+      time: 0,
+      maxTime: weapon.range / (weapon.type === 'rocket' ? 40 : 120),
+      type: weapon.type,
+      damage: weapon.damage,
+    })
+    // Decrease ammo
+    if (weapon.ammo !== Infinity) {
+      const w = [...weapons]
+      w[currentWeaponIndex] = { ...w[currentWeaponIndex], ammo: w[currentWeaponIndex].ammo - 1 }
+      useGameStore.setState({ weapons: w })
+    }
+  }
+
   return (
     <group>
-      {/* Invisible physics sphere */}
       <mesh ref={sphereRef}>
         <sphereGeometry args={[0.01]} />
         <meshBasicMaterial visible={false} />
       </mesh>
 
-      {/* Humanoid character */}
       <Humanoid
         position={position}
         leftArmRef={leftArmRef}
         rightArmRef={rightArmRef}
         leftLegRef={leftLegRef}
         rightLegRef={rightLegRef}
+        currentWeaponIndex={currentWeaponIndex}
       />
+
+      <Projectiles projectilesRef={projectilesRef} />
     </group>
   )
 }
 
-function Humanoid({ position, leftArmRef, rightArmRef, leftLegRef, rightLegRef }) {
+function Projectiles({ projectilesRef }) {
+  const groupRef = useRef()
+  const meshRefs = useRef([])
+
+  useFrame((state, delta) => {
+    const projectiles = projectilesRef.current
+    // Update existing projectiles
+    for (let i = projectiles.length - 1; i >= 0; i--) {
+      const p = projectiles[i]
+      p.time += delta
+      if (p.time > p.maxTime) {
+        projectiles.splice(i, 1)
+        continue
+      }
+    }
+    // Sync visual meshes
+    if (groupRef.current) {
+      // Remove extra children
+      while (groupRef.current.children.length > projectiles.length) {
+        groupRef.current.remove(groupRef.current.children[groupRef.current.children.length - 1])
+      }
+      // Add missing children
+      while (groupRef.current.children.length < projectiles.length) {
+        const geo = new THREE.SphereGeometry(0.1, 6, 6)
+        const mat = new THREE.MeshBasicMaterial({ color: 0xffff00 })
+        const mesh = new THREE.Mesh(geo, mat)
+        groupRef.current.add(mesh)
+      }
+      // Update positions
+      for (let i = 0; i < projectiles.length; i++) {
+        const p = projectiles[i]
+        const dist = p.speed * p.time
+        groupRef.current.children[i].position.set(
+          p.origin.x + p.direction.x * dist,
+          p.origin.y + p.direction.y * dist,
+          p.origin.z + p.direction.z * dist
+        )
+        if (p.type === 'rocket') {
+          groupRef.current.children[i].scale.setScalar(2)
+          groupRef.current.children[i].material.color.setHex(0xff4400)
+        }
+      }
+    }
+  })
+
+  return <group ref={groupRef} />
+}
+
+function Humanoid({ position, leftArmRef, rightArmRef, leftLegRef, rightLegRef, currentWeaponIndex }) {
   const groupRef = useRef()
   const playerRotation = useGameStore((s) => s.playerRotation)
+  const weaponColors = ['#e8b88a', '#333333', '#555555', '#445544']
 
   useFrame(() => {
     if (groupRef.current) {
@@ -177,33 +295,28 @@ function Humanoid({ position, leftArmRef, rightArmRef, leftLegRef, rightLegRef }
         <sphereGeometry args={[0.25, 12, 12]} />
         <meshStandardMaterial color="#e8b88a" roughness={0.7} />
       </mesh>
-
       {/* Hair */}
       <mesh position={[0, 1.82, -0.05]} castShadow>
         <sphereGeometry args={[0.22, 12, 12]} />
         <meshStandardMaterial color="#3a2a1a" roughness={0.9} />
       </mesh>
-
       {/* Torso */}
       <mesh position={[0, 1.1, 0]} castShadow>
         <boxGeometry args={[0.55, 0.7, 0.3]} />
         <meshStandardMaterial color="#2244aa" roughness={0.6} />
       </mesh>
-
       {/* Left Arm */}
       <group ref={leftArmRef} position={[-0.38, 1.35, 0]}>
         <mesh castShadow>
           <capsuleGeometry args={[0.08, 0.45, 4, 8]} />
           <meshStandardMaterial color="#2244aa" roughness={0.6} />
         </mesh>
-        {/* Hand */}
         <mesh position={[0, -0.35, 0]}>
           <sphereGeometry args={[0.07, 8, 8]} />
           <meshStandardMaterial color="#e8b88a" roughness={0.7} />
         </mesh>
       </group>
-
-      {/* Right Arm */}
+      {/* Right Arm + Weapon */}
       <group ref={rightArmRef} position={[0.38, 1.35, 0]}>
         <mesh castShadow>
           <capsuleGeometry args={[0.08, 0.45, 4, 8]} />
@@ -213,27 +326,30 @@ function Humanoid({ position, leftArmRef, rightArmRef, leftLegRef, rightLegRef }
           <sphereGeometry args={[0.07, 8, 8]} />
           <meshStandardMaterial color="#e8b88a" roughness={0.7} />
         </mesh>
+        {/* Weapon in hand */}
+        {currentWeaponIndex > 0 && (
+          <mesh position={[0, -0.3, 0.15]} rotation={[0.3, 0, 0]}>
+            <boxGeometry args={currentWeaponIndex === 3 ? [0.06, 0.06, 0.6] : [0.05, 0.08, 0.3]} />
+            <meshStandardMaterial color={weaponColors[currentWeaponIndex]} metalness={0.7} roughness={0.3} />
+          </mesh>
+        )}
       </group>
-
       {/* Hips */}
       <mesh position={[0, 0.7, 0]} castShadow>
         <boxGeometry args={[0.45, 0.15, 0.28]} />
         <meshStandardMaterial color="#333344" roughness={0.7} />
       </mesh>
-
       {/* Left Leg */}
       <group ref={leftLegRef} position={[-0.13, 0.35, 0]}>
         <mesh castShadow>
           <capsuleGeometry args={[0.09, 0.45, 4, 8]} />
           <meshStandardMaterial color="#333344" roughness={0.7} />
         </mesh>
-        {/* Shoe */}
         <mesh position={[0, -0.35, 0.05]} castShadow>
           <boxGeometry args={[0.12, 0.1, 0.2]} />
           <meshStandardMaterial color="#222222" roughness={0.8} />
         </mesh>
       </group>
-
       {/* Right Leg */}
       <group ref={rightLegRef} position={[0.13, 0.35, 0]}>
         <mesh castShadow>
@@ -245,8 +361,7 @@ function Humanoid({ position, leftArmRef, rightArmRef, leftLegRef, rightLegRef }
           <meshStandardMaterial color="#222222" roughness={0.8} />
         </mesh>
       </group>
-
-      {/* Direction indicator arrow on ground */}
+      {/* Direction indicator */}
       <mesh position={[0, 0.02, -0.6]} rotation={[-Math.PI / 2, 0, 0]}>
         <coneGeometry args={[0.12, 0.35, 6]} />
         <meshStandardMaterial color="#ff4444" emissive="#ff2222" emissiveIntensity={0.5} transparent opacity={0.7} />
