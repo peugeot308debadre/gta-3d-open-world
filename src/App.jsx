@@ -29,7 +29,7 @@ export default function App() {
         gl={{
           antialias: true,
           toneMapping: THREE.ACESFilmicToneMapping,
-          toneMappingExposure: 1.0,
+          toneMappingExposure: 1.8,
           powerPreference: 'high-performance',
         }}
         camera={{
