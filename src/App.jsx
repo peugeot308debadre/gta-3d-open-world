@@ -8,6 +8,7 @@ import City from './components/City'
 import Vehicles from './components/Vehicles'
 import DayNightCycle from './components/DayNightCycle'
 import PostProcessing from './components/PostProcessing'
+import Weather from './components/Weather'
 import UI from './components/UI'
 
 function LoadingScreen() {
@@ -40,10 +41,8 @@ export default function App() {
         dpr={[1, 2]}
       >
         <Suspense fallback={<LoadingScreen />}>
-          {/* Day/Night lighting system */}
           <DayNightCycle />
 
-          {/* Physics world */}
           <Physics
             gravity={[0, -20, 0]}
             broadphase="SAP"
@@ -53,25 +52,17 @@ export default function App() {
               restitution: 0.1,
             }}
           >
-            {/* Ground physics plane */}
             <Ground />
-
-            {/* Player with 3rd person controller */}
             <Player />
           </Physics>
 
-          {/* City environment */}
           <City />
-
-          {/* NPC Vehicles */}
           <Vehicles />
-
-          {/* Post-processing effects */}
+          <Weather />
           <PostProcessing />
         </Suspense>
       </Canvas>
 
-      {/* HTML/CSS UI overlay */}
       <UI />
     </div>
   )
