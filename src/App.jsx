@@ -9,6 +9,7 @@ import Vehicles from './components/Vehicles'
 import DayNightCycle from './components/DayNightCycle'
 import PostProcessing from './components/PostProcessing'
 import Weather from './components/Weather'
+import MaxGraphics from './components/MaxGraphics'
 import UI from './components/UI'
 
 function LoadingScreen() {
@@ -31,11 +32,12 @@ export default function App() {
           toneMapping: THREE.ACESFilmicToneMapping,
           toneMappingExposure: 1.8,
           powerPreference: 'high-performance',
+          logarithmicDepthBuffer: true,
         }}
         camera={{
           fov: 60,
           near: 0.1,
-          far: 500,
+          far: 800,
           position: [0, 10, 15],
         }}
         dpr={[1, 2]}
@@ -59,6 +61,7 @@ export default function App() {
           <City />
           <Vehicles />
           <Weather />
+          <MaxGraphics />
           <PostProcessing />
         </Suspense>
       </Canvas>

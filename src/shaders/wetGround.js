@@ -15,8 +15,9 @@ export const wetGroundVertexShader = `
     vWorldPosition = worldPos.xyz;
     vNormal = normalize(normalMatrix * normal);
 
-    // Subtle wave displacement for puddles
+    // Multi-layer wave displacement for puddles
     float wave = sin(worldPos.x * 3.0 + uTime * 2.0) * cos(worldPos.z * 3.0 + uTime * 1.5) * 0.02 * uRainIntensity;
+    wave += sin(worldPos.x * 7.0 - uTime * 3.0) * cos(worldPos.z * 5.0 + uTime * 2.0) * 0.008 * uRainIntensity;
     vec3 displacedPosition = position + normal * wave;
 
     vec4 mvPosition = modelViewMatrix * vec4(displacedPosition, 1.0);
@@ -37,7 +38,7 @@ export const wetGroundFragmentShader = `
   uniform vec3 uLightColor;
   uniform float uAmbientIntensity;
 
-  // Simplex noise function
+  // Simplex noise
   vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
   vec2 mod289(vec2 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
   vec3 permute(vec3 x) { return mod289(((x*34.0)+1.0)*x); }
@@ -69,50 +70,90 @@ export const wetGroundFragmentShader = `
     return 130.0 * dot(m, g);
   }
 
+  // Road marking detection
+  float roadMarking(vec3 wp) {
+    // Center dashed line
+    float roadPeriod = 26.0;
+    float roadCenter = mod(wp.z + roadPeriod * 0.5, roadPeriod) - roadPeriod * 0.5;
+    float onRoadH = abs(roadCenter) < 4.0 ? 1.0 : 0.0;
+    float dashH = onRoadH * step(mod(wp.x, 6.0), 3.0) * step(abs(wp.z - floor(wp.z / roadPeriod + 0.5) * roadPeriod), 0.08);
+
+    // Vertical road
+    float roadCenterV = mod(wp.x + roadPeriod * 0.5, roadPeriod) - roadPeriod * 0.5;
+    float onRoadV = abs(roadCenterV) < 4.0 ? 1.0 : 0.0;
+    float dashV = onRoadV * step(mod(wp.z, 6.0), 3.0) * step(abs(wp.x - floor(wp.x / roadPeriod + 0.5) * roadPeriod), 0.08);
+
+    return max(dashH, dashV);
+  }
+
   void main() {
     vec3 normal = normalize(vNormal);
     vec3 viewDir = normalize(vViewDir);
     vec3 lightDir = normalize(uLightDirection);
 
-    // Base asphalt/road color
-    vec3 baseColor = vec3(0.15, 0.15, 0.17);
+    // Multi-octave asphalt base
+    vec3 baseColor = vec3(0.14, 0.14, 0.16);
+    float n1 = snoise(vWorldPosition.xz * 0.15);
+    float n2 = snoise(vWorldPosition.xz * 0.5);
+    float n3 = snoise(vWorldPosition.xz * 2.0);
+    baseColor += vec3(n1 * 0.04 + n2 * 0.02 + n3 * 0.01);
 
-    // Add road markings
-    float roadLine = smoothstep(0.48, 0.5, abs(fract(vWorldPosition.x * 0.1) - 0.5));
-    vec3 roadColor = mix(vec3(0.7, 0.7, 0.6), baseColor, roadLine);
+    // Road markings
+    float marking = roadMarking(vWorldPosition);
+    baseColor = mix(baseColor, vec3(0.8, 0.8, 0.7), marking * 0.6);
 
-    // Puddle detection using noise
+    // Sidewalk detection
+    float roadPeriod = 26.0;
+    float onSidewalkH = step(4.0, abs(mod(vWorldPosition.z + roadPeriod * 0.5, roadPeriod) - roadPeriod * 0.5));
+    float onSidewalkV = step(4.0, abs(mod(vWorldPosition.x + roadPeriod * 0.5, roadPeriod) - roadPeriod * 0.5));
+    float onSidewalk = max(onSidewalkH, onSidewalkV);
+    vec3 sidewalkColor = mix(baseColor, vec3(0.45, 0.45, 0.42), onSidewalk * 0.5);
+
+    // Puddle system
     float puddleNoise = snoise(vWorldPosition.xz * 0.15 + uTime * 0.1);
-    float puddle = smoothstep(0.3, 0.6, puddleNoise) * uRainIntensity;
+    float puddleNoise2 = snoise(vWorldPosition.xz * 0.3 - uTime * 0.05);
+    float puddle = smoothstep(0.2, 0.6, puddleNoise * 0.7 + puddleNoise2 * 0.3) * uRainIntensity;
 
-    // Ripple effect for puddles
-    float ripple1 = sin(length(vWorldPosition.xz - vec2(2.0, 3.0)) * 15.0 - uTime * 8.0) * 0.5 + 0.5;
-    float ripple2 = sin(length(vWorldPosition.xz - vec2(-5.0, 1.0)) * 12.0 - uTime * 6.0) * 0.5 + 0.5;
-    float ripple3 = sin(length(vWorldPosition.xz - vec2(1.0, -4.0)) * 18.0 - uTime * 10.0) * 0.5 + 0.5;
-    float ripple = max(max(ripple1, ripple2), ripple3) * puddle;
+    // Multi-source ripples
+    float ripple = 0.0;
+    for (int i = 0; i < 4; i++) {
+      vec2 center = vec2(float(i) * 37.0 + 10.0, float(i) * 23.0 + 5.0);
+      float r = sin(length(vWorldPosition.xz - center) * 12.0 - uTime * float(i + 5) * 2.0) * 0.5 + 0.5;
+      ripple = max(ripple, r);
+    }
+    ripple *= puddle;
 
-    // Reflection calculation (fake environment reflection)
-    vec3 reflectDir = reflect(-viewDir, normal + vec3(ripple * 0.1));
-    float fresnel = pow(1.0 - max(dot(normal, viewDir), 0.0), 3.0);
-    vec3 fakeEnvColor = vec3(0.1, 0.1, 0.2) + reflectDir.y * 0.3;
+    // Reflection with perturbation
+    vec3 perturbedNormal = normal + vec3(ripple * 0.08, 0.0, ripple * 0.08);
+    vec3 reflectDir = reflect(-viewDir, perturbedNormal);
+    float fresnel = pow(1.0 - max(dot(normal, viewDir), 0.0), 4.0);
 
-    // Mix wet surface with puddle reflection
-    float wetness = uRainIntensity * 0.6;
-    vec3 wetColor = roadColor * (1.0 - wetness * 0.3);
-    vec3 puddleColor = mix(wetColor, fakeEnvColor, fresnel * puddle * 0.8);
-    vec3 finalColor = mix(wetColor, puddleColor, puddle);
+    // Sky reflection color
+    vec3 skyRef = mix(vec3(0.3, 0.35, 0.5), vec3(0.6, 0.65, 0.8), reflectDir.y * 0.5 + 0.5);
+    vec3 buildingRef = vec3(0.08, 0.08, 0.12) + reflectDir.x * 0.05;
+    vec3 fakeEnvColor = mix(buildingRef, skyRef, smoothstep(-0.2, 0.3, reflectDir.y));
 
-    // Specular highlight from light
+    // Mix wet and puddle
+    float wetness = uRainIntensity * 0.7;
+    vec3 wetSurface = sidewalkColor * (1.0 - wetness * 0.4);
+    vec3 puddleSurface = mix(wetSurface, fakeEnvColor, fresnel * 0.7);
+    vec3 finalColor = mix(wetSurface, puddleSurface, puddle);
+
+    // Specular highlights
     vec3 halfDir = normalize(lightDir + viewDir);
-    float spec = pow(max(dot(normal, halfDir), 0.0), 64.0);
-    finalColor += spec * uLightColor * 0.5 * (wetness + puddle * 0.5);
+    float spec = pow(max(dot(perturbedNormal, halfDir), 0.0), 80.0);
+    finalColor += spec * uLightColor * 0.8 * (wetness + puddle * 0.5);
 
-    // Ambient light
-    finalColor *= (uAmbientIntensity + 0.3);
+    // Ambient
+    finalColor *= (uAmbientIntensity + 0.4);
 
-    // Rain streak effect
-    float streak = snoise(vec2(vWorldPosition.x * 2.0 + uTime * 3.0, vWorldPosition.z * 0.5));
-    finalColor += vec3(0.02) * max(streak, 0.0) * uRainIntensity;
+    // Rain streaks
+    float streak = snoise(vec2(vWorldPosition.x * 3.0 + uTime * 4.0, vWorldPosition.z * 0.5));
+    finalColor += vec3(0.015) * max(streak, 0.0) * uRainIntensity;
+
+    // Subtle tire marks on road
+    float tireMark = snoise(vec2(vWorldPosition.x * 0.5, vWorldPosition.z * 0.02)) * 0.03;
+    finalColor -= vec3(tireMark) * (1.0 - onSidewalk);
 
     gl_FragColor = vec4(finalColor, 1.0);
   }
