@@ -64,8 +64,20 @@ createServer((req, res) => {
 
   if (serveFile(res, filePath)) return
 
-  // SPA fallback → index.html
-  res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
+  // For asset requests (has extension), return 404 — NOT index.html
+  if (extname(url)) {
+    res.writeHead(404, { 'content-type': 'text/plain' })
+    res.end('Not found')
+    return
+  }
+
+  // SPA fallback → index.html (navigation routes only, never cache)
+  res.writeHead(200, {
+    'content-type': 'text/html; charset=utf-8',
+    'cache-control': 'no-cache, no-store, must-revalidate',
+    'pragma': 'no-cache',
+    'expires': '0',
+  })
   res.end(indexContent)
 }).listen(PORT, '0.0.0.0', () => {
   console.log(`
