@@ -1,11 +1,11 @@
 import { createServer } from 'http'
-import { readFileSync, existsSync, readdirSync, statSync } from 'fs'
-import { resolve, dirname, extname, join } from 'path'
+import { readFileSync, existsSync, statSync } from 'fs'
+import { resolve, dirname, extname } from 'path'
 import { fileURLToPath } from 'url'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-const PORT = 8011
-const PROXY_PREFIX = '/agent/42739'
+const PORT = 8012
+const PROXY_PREFIX = '/agent/34411'
 
 const distDir = resolve(__dirname, 'dist')
 const indexHtml = resolve(distDir, 'index.html')
@@ -18,6 +18,7 @@ if (!existsSync(indexHtml)) {
 const MIME = {
   '.html': 'text/html',
   '.js': 'application/javascript',
+  '.mjs': 'application/javascript',
   '.css': 'text/css',
   '.json': 'application/json',
   '.png': 'image/png',
@@ -26,9 +27,18 @@ const MIME = {
   '.ico': 'image/x-icon',
   '.woff': 'font/woff',
   '.woff2': 'font/woff2',
+  '.wasm': 'application/wasm',
 }
 
-const indexContent = readFileSync(indexHtml, 'utf8')
+// Read HTML and strip crossorigin to avoid CORS issues behind reverse proxy
+let indexContent = readFileSync(indexHtml, 'utf8')
+indexContent = indexContent.replace(/\s+crossorigin/g, '')
+
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
+}
 
 function serveFile(res, filePath) {
   if (!existsSync(filePath)) return false
@@ -39,14 +49,22 @@ function serveFile(res, filePath) {
   const mime = MIME[ext] || 'application/octet-stream'
   const data = readFileSync(filePath)
   res.writeHead(200, {
-    'content-type': mime + (ext === '.js' ? '; charset=utf-8' : ''),
-    'cache-control': ext === '.js' || ext === '.css' ? 'public, max-age=31536000, immutable' : 'public, max-age=3600',
+    ...CORS_HEADERS,
+    'content-type': mime + (ext === '.js' || ext === '.mjs' ? '; charset=utf-8' : ''),
+    'cache-control': 'no-cache, no-store, must-revalidate',
   })
   res.end(data)
   return true
 }
 
 createServer((req, res) => {
+  // Handle CORS preflight
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204, CORS_HEADERS)
+    res.end()
+    return
+  }
+
   let url = req.url.split('?')[0]
 
   // Strip proxy prefix for internal routing
@@ -64,15 +82,16 @@ createServer((req, res) => {
 
   if (serveFile(res, filePath)) return
 
-  // For asset requests (has extension), return 404 — NOT index.html
+  // For asset requests (has extension), return 404
   if (extname(url)) {
-    res.writeHead(404, { 'content-type': 'text/plain' })
+    res.writeHead(404, { 'content-type': 'text/plain', ...CORS_HEADERS })
     res.end('Not found')
     return
   }
 
-  // SPA fallback → index.html (navigation routes only, never cache)
+  // SPA fallback → index.html (no crossorigin, no cache)
   res.writeHead(200, {
+    ...CORS_HEADERS,
     'content-type': 'text/html; charset=utf-8',
     'cache-control': 'no-cache, no-store, must-revalidate',
     'pragma': 'no-cache',

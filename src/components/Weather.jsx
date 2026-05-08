@@ -2,7 +2,7 @@ import React, { useRef, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 
-const RAIN_COUNT = 6000
+const RAIN_COUNT = 2000
 const RAIN_AREA = 80
 const LIGHTNING_MIN_INTERVAL = 8
 const LIGHTNING_MAX_INTERVAL = 25

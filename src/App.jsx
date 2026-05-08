@@ -91,7 +91,7 @@ export default function App() {
           far: 1000,
           position: [0, 10, 15],
         }}
-        dpr={[1, 2]}
+        dpr={[1, 1.5]}
         performance={{ min: 0.5 }}
         onCreated={({ gl }) => {
           gl.setClearColor('#0a0a12')

@@ -8,9 +8,9 @@ import { keysPressed, getMovementVector } from '../hooks/useKeyboardControls'
 const PLAYER_SPEED = 10
 const SPRINT_MULTIPLIER = 2.0
 const JUMP_FORCE = 7
-const CAMERA_DISTANCE = 10
-const CAMERA_HEIGHT = 6
-const CAMERA_SMOOTHING = 0.08
+const CAMERA_DISTANCE = 4
+const CAMERA_HEIGHT = 3
+const CAMERA_SMOOTHING = 0.12
 
 export default function Player() {
   const { camera } = useThree()

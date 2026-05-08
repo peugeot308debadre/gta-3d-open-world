@@ -242,10 +242,7 @@ function FlowerPatch({ position }) {
 function AmbientParticles() {
   return (
     <group>
-      {/* Dust motes in the air */}
-      <Sparkles count={500} scale={[200, 30, 200]} size={0.8} speed={0.3} opacity={0.3} color="#ffffcc" />
-      {/* Fireflies at night */}
-      <Sparkles count={200} scale={[150, 15, 150]} size={2} speed={0.5} opacity={0.6} color="#aaff44" />
+      <Sparkles count={200} scale={[200, 30, 200]} size={0.8} speed={0.3} opacity={0.3} color="#ffffcc" />
     </group>
   )
 }

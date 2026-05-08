@@ -134,9 +134,9 @@ export default function DayNightCycle() {
         mieDirectionalG={0.97}
       />
 
-      {/* Stars - dense starfield */}
+      {/* Stars */}
       <Sparkles
-        count={4000}
+        count={1000}
         scale={[400, 250, 400]}
         size={2}
         speed={0.05}
@@ -150,14 +150,14 @@ export default function DayNightCycle() {
         position={[50, 80, 30]}
         intensity={6}
         castShadow
-        shadow-mapSize-width={4096}
-        shadow-mapSize-height={4096}
-        shadow-camera-far={300}
-        shadow-camera-left={-100}
-        shadow-camera-right={100}
-        shadow-camera-top={100}
-        shadow-camera-bottom={-100}
-        shadow-bias={-0.0002}
+        shadow-mapSize-width={1024}
+        shadow-mapSize-height={1024}
+        shadow-camera-far={200}
+        shadow-camera-left={-60}
+        shadow-camera-right={60}
+        shadow-camera-top={60}
+        shadow-camera-bottom={-60}
+        shadow-bias={-0.0005}
         shadow-normalBias={0.02}
       />
 

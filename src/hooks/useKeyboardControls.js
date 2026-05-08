@@ -31,9 +31,10 @@ export function getMovementVector(keys) {
   let jump = false
   let sprint = false
 
-  if (keys['KeyW'] || keys['ArrowUp']) forward += 1
+  // AZERTY (ZQSD) + QWERTY (WASD) + Arrow keys
+  if (keys['KeyW'] || keys['KeyZ'] || keys['ArrowUp']) forward += 1
   if (keys['KeyS'] || keys['ArrowDown']) forward -= 1
-  if (keys['KeyA'] || keys['ArrowLeft']) right -= 1
+  if (keys['KeyA'] || keys['KeyQ'] || keys['ArrowLeft']) right -= 1
   if (keys['KeyD'] || keys['ArrowRight']) right += 1
   if (keys['Space']) jump = true
   if (keys['ShiftLeft'] || keys['ShiftRight']) sprint = true
