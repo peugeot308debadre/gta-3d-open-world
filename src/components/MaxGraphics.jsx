@@ -3,6 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import { Sparkles } from '@react-three/drei'
 import * as THREE from 'three'
 import { createGrassTexture } from '../utils/proceduralTextures'
+import { BLOCK_SIZE } from './City'
 
 function seededRandom(seed) {
   let s = seed
