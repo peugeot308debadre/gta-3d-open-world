@@ -8,9 +8,9 @@ import { keysPressed, getMovementVector } from '../hooks/useKeyboardControls'
 const PLAYER_SPEED = 10
 const SPRINT_MULTIPLIER = 2.0
 const JUMP_FORCE = 7
-const CAMERA_DISTANCE = 10
-const CAMERA_HEIGHT = 6
-const CAMERA_SMOOTHING = 0.08
+const CAMERA_DISTANCE = 4
+const CAMERA_HEIGHT = 3
+const CAMERA_SMOOTHING = 0.12
 
 export default function Player() {
   const { camera } = useThree()
@@ -42,6 +42,7 @@ export default function Player() {
   const isDragging = useRef(false)
   const lastMouse = useRef({ x: 0, y: 0 })
   const mouseDown = useRef(false)
+  const _lookAtTarget = useRef(new THREE.Vector3())
 
   const leftArmRef = useRef()
   const rightArmRef = useRef()
@@ -182,7 +183,8 @@ export default function Player() {
     camera.position.x += (pos[0] + Math.sin(cameraAngleY.current) * CAMERA_DISTANCE - camera.position.x) * CAMERA_SMOOTHING
     camera.position.y += (pos[1] + CAMERA_HEIGHT - camera.position.y) * CAMERA_SMOOTHING
     camera.position.z += (pos[2] + Math.cos(cameraAngleY.current) * CAMERA_DISTANCE - camera.position.z) * CAMERA_SMOOTHING
-    camera.lookAt(new THREE.Vector3(pos[0], pos[1] + 1.5, pos[2]))
+    _lookAtTarget.current.set(pos[0], pos[1] + 1.5, pos[2])
+    camera.lookAt(_lookAtTarget.current)
   })
 
   function fireWeapon(weapon, pos, angle) {

@@ -1,46 +1,20 @@
-import React, { useRef, useMemo, useEffect, useCallback } from 'react'
-import { useFrame, useThree } from '@react-three/fiber'
+import React from 'react'
 import {
   EffectComposer,
-  Bloom,
-  ChromaticAberration,
   Vignette,
   ToneMapping,
 } from '@react-three/postprocessing'
 import { BlendFunction, ToneMappingMode } from 'postprocessing'
-import * as THREE from 'three'
-import useGameStore from '../hooks/useGameStore'
 
 export default function PostProcessing() {
-  const playerPosition = useGameStore((s) => s.playerPosition)
-
-  const bloomRef = useRef()
-
   return (
-    <EffectComposer multisampling={4}>
-      {/* Bloom for neon lights and emissive materials */}
-      <Bloom
-        ref={bloomRef}
-        intensity={1.0}
-        luminanceThreshold={0.5}
-        luminanceSmoothing={0.4}
-        mipmapBlur
-      />
-
-      {/* Subtle Chromatic Aberration */}
-      <ChromaticAberration
-        blendFunction={BlendFunction.NORMAL}
-        offset={new THREE.Vector2(0.0003, 0.0003)}
-      />
-
-      {/* Very subtle Vignette */}
+    <EffectComposer multisampling={0} disableNormalPass>
       <Vignette
-        offset={0.5}
-        darkness={0.25}
+        offset={0.3}
+        darkness={0.5}
         blendFunction={BlendFunction.NORMAL}
+        eskil={false}
       />
-
-      {/* Tone mapping */}
       <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
     </EffectComposer>
   )

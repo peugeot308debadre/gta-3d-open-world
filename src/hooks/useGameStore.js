@@ -63,6 +63,7 @@ const useGameStore = create((set, get) => ({
     if (current >= amount) { set({ money: current - amount }); return true }
     return false
   },
+  setMoney: (money) => set({ money }),
 }))
 
 export default useGameStore

@@ -3,6 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import { Sparkles } from '@react-three/drei'
 import * as THREE from 'three'
 import { createGrassTexture } from '../utils/proceduralTextures'
+import { BLOCK_SIZE } from './City'
 
 function seededRandom(seed) {
   let s = seed
@@ -241,10 +242,7 @@ function FlowerPatch({ position }) {
 function AmbientParticles() {
   return (
     <group>
-      {/* Dust motes in the air */}
-      <Sparkles count={500} scale={[200, 30, 200]} size={0.8} speed={0.3} opacity={0.3} color="#ffffcc" />
-      {/* Fireflies at night */}
-      <Sparkles count={200} scale={[150, 15, 150]} size={2} speed={0.5} opacity={0.6} color="#aaff44" />
+      <Sparkles count={200} scale={[200, 30, 200]} size={0.8} speed={0.3} opacity={0.3} color="#ffffcc" />
     </group>
   )
 }
@@ -370,7 +368,8 @@ function PowerLines() {
   return (
     <group>
       {lines.map((l, i) => {
-        const mid = [(l.start[0] + l.end[0]) / 2, 6.2, (l.start[1] + l.end[1]) / 2 + (l.start[2] + l.end[2]) / 2 - (l.start[1] + l.end[1]) / 2]
+        const midX = (l.start[0] + l.end[0]) / 2
+        const midZ = (l.start[2] + l.end[2]) / 2
         return (
           <group key={i}>
             {/* Poles */}
@@ -390,6 +389,11 @@ function PowerLines() {
             <mesh position={[l.end[0], 7, l.end[2]]}>
               <boxGeometry args={[1.5, 0.06, 0.06]} />
               <meshStandardMaterial color="#555" />
+            </mesh>
+            {/* Wire (catenary curve) */}
+            <mesh position={[midX, 6.5, midZ]}>
+              <cylinderGeometry args={[0.01, 0.01, Math.sqrt((l.end[0] - l.start[0]) ** 2 + (l.end[2] - l.start[2]) ** 2), 4]} />
+              <meshStandardMaterial color="#333" />
             </mesh>
           </group>
         )
