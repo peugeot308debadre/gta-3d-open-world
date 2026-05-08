@@ -1,46 +1,45 @@
-import React, { useRef, useMemo, useEffect, useCallback } from 'react'
-import { useFrame, useThree } from '@react-three/fiber'
+import React, { useRef, useMemo } from 'react'
 import {
   EffectComposer,
   Bloom,
   ChromaticAberration,
   Vignette,
   ToneMapping,
+  BrightnessContrast,
+  HueSaturation,
 } from '@react-three/postprocessing'
-import { BlendFunction, ToneMappingMode } from 'postprocessing'
+import { BlendFunction, ToneMappingMode, KernelSize } from 'postprocessing'
 import * as THREE from 'three'
-import useGameStore from '../hooks/useGameStore'
 
 export default function PostProcessing() {
-  const playerPosition = useGameStore((s) => s.playerPosition)
-
   const bloomRef = useRef()
+  const chromaticOffset = useMemo(() => new THREE.Vector2(0.0004, 0.0004), [])
 
   return (
-    <EffectComposer multisampling={4}>
-      {/* Bloom for neon lights and emissive materials */}
+    <EffectComposer multisampling={4} disableNormalPass>
       <Bloom
         ref={bloomRef}
-        intensity={1.0}
-        luminanceThreshold={0.5}
-        luminanceSmoothing={0.4}
+        intensity={1.4}
+        luminanceThreshold={0.25}
+        luminanceSmoothing={0.6}
         mipmapBlur
+        kernelSize={KernelSize.LARGE}
+        levels={8}
       />
-
-      {/* Subtle Chromatic Aberration */}
       <ChromaticAberration
         blendFunction={BlendFunction.NORMAL}
-        offset={new THREE.Vector2(0.0003, 0.0003)}
+        offset={chromaticOffset}
+        radialModulation
+        modulationOffset={0.3}
       />
-
-      {/* Very subtle Vignette */}
       <Vignette
-        offset={0.5}
-        darkness={0.25}
+        offset={0.3}
+        darkness={0.65}
         blendFunction={BlendFunction.NORMAL}
+        eskil={false}
       />
-
-      {/* Tone mapping */}
+      <BrightnessContrast brightness={0.05} contrast={0.15} />
+      <HueSaturation hue={0.02} saturation={0.2} />
       <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
     </EffectComposer>
   )

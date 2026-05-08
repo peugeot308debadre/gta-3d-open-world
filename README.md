@@ -13,7 +13,7 @@ npm install
 npm run dev
 ```
 
-Ouvrir http://localhost:8011 dans votre navigateur.
+Ouvrir https://www.graalnode.com/agent/42739 dans votre navigateur.
 
 ## 🎮 Contrôles
 
